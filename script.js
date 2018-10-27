@@ -10,7 +10,7 @@ let intermediateTexture1, intermediateFrameBuffer1;
 let intermediateTexture2, intermediateFrameBuffer2;
 let currentBuffer = 1;
 
-setupWebGL ();
+setupWebGL();
 
 function setupWebGL() {
   canvas = document.querySelector("#glCanvas");
@@ -20,7 +20,7 @@ function setupWebGL() {
   if (gl === null) return alert("Unable to initialize WebGL. Your browser or machine may not support it.");
 
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
-  gl.clearColor(1.0, 1.0, 1.0, 1.0);
+  gl.clearColor(0.5, 0.5, 0.5, 1.0);
   gl.clear(gl.COLOR_BUFFER_BIT);
 
   // -------------- Vertex shader ---------------------
@@ -53,8 +53,10 @@ function setupWebGL() {
     #else
       precision mediump float;
     #endif
+    uniform sampler2D uSampler;
     void main() {
-      gl_FragColor = vec4(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0, 0, 1);
+      gl_FragColor = texture2D(uSampler, vec2(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0 - 1.0/512.0));
+      // gl_FragColor = vec4(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0, 0, 1);
     }
   `);
   gl.compileShader(fragmentShader);
@@ -129,6 +131,17 @@ function initTexture() {
   intermediateTexture1 = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
 
+  const initialData = new Uint8Array(width*height*4);
+  for (let yi = 0; yi < height; yi++) {
+    for (let xi = 0; xi < width; xi++) {
+      const value = (Math.floor(xi / 32) + Math.floor(yi / 32)) % 2 === 0 ? 192 : 64;
+      initialData[(xi + yi*width) * 4 + 0] = value;
+      initialData[(xi + yi*width) * 4 + 1] = value;
+      initialData[(xi + yi*width) * 4 + 2] = value;
+      initialData[(xi + yi*width) * 4 + 3] = 255; // alpha
+    }
+  }
+
   {
     // define size and format of level 0
     const level = 0;
@@ -139,7 +152,7 @@ function initTexture() {
     const data = null;
     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
                   targetTextureWidth, targetTextureHeight, border,
-                  format, type, data);
+                  format, type, initialData);
 
     // set the filtering so we don't need mips
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -168,7 +181,7 @@ function initTexture() {
     const data = null;
     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
                   targetTextureWidth, targetTextureHeight, border,
-                  format, type, data);
+                  format, type, initialData);
 
     // set the filtering so we don't need mips
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
@@ -188,22 +201,26 @@ function initTexture() {
 
 function render() {
   window.requestAnimationFrame(render, canvas);
+  // Slowed down for debugging
+  // setTimeout(render, 500);
 
   // Update frame buffer (texture data)
   gl.useProgram(program);
   positionLocation = gl.getAttribLocation(program, "a_position");
   gl.enableVertexAttribArray(positionLocation);
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
-  uSampler = gl.getUniformLocation(copyProgram, 'uSampler');
+  uSampler = gl.getUniformLocation(program, 'uSampler');
   gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
   if (currentBuffer === 1) {
-    gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
+    gl.bindTexture(gl.TEXTURE_2D, intermediateTexture2);
     gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer1);
   } else {
     gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
     gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer2);
   }
 
+  // gl.clearColor(currentBuffer === 1 ? 0.55 : 0.45, 0.5, 0.5, 1.0);
+  // gl.clear(gl.COLOR_BUFFER_BIT);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   // Draw to screen
@@ -215,6 +232,8 @@ function render() {
   gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
   gl.enableVertexAttribArray(positionLocation);
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+  // gl.clearColor(0.5, 0.5, 0.5, 1.0);
+  // gl.clear(gl.COLOR_BUFFER_BIT);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   currentBuffer = currentBuffer === 1 ? 2 : 1;
