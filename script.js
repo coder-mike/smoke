@@ -5,12 +5,15 @@
 
 const width = 512;
 const height = 512;
-let gl, program, copyProgram, buffer, fb, targetTexture;
+let gl, program, copyProgram, buffer, canvas;
+let intermediateTexture1, intermediateFrameBuffer1;
+let intermediateTexture2, intermediateFrameBuffer2;
+let currentBuffer = 1;
 
 setupWebGL ();
 
 function setupWebGL() {
-  const canvas = document.querySelector("#glCanvas");
+  canvas = document.querySelector("#glCanvas");
   canvas.width = width;
   canvas.height = height;
   gl = canvas.getContext("webgl");
@@ -123,8 +126,8 @@ function setupWebGL() {
 function initTexture() {
   const targetTextureWidth = width;
   const targetTextureHeight = height;
-  targetTexture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, targetTexture);
+  intermediateTexture1 = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
 
   {
     // define size and format of level 0
@@ -144,36 +147,77 @@ function initTexture() {
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     // Create and bind the framebuffer
-    fb = gl.createFramebuffer();
-    gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+    intermediateFrameBuffer1 = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer1);
 
     // attach the texture as the first color attachment
     const attachmentPoint = gl.COLOR_ATTACHMENT0;
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, targetTexture, level);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, intermediateTexture1, level);
+  }
+
+  intermediateTexture2 = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture2);
+
+  {
+    // define size and format of level 0
+    const level = 0;
+    const internalFormat = gl.RGBA;
+    const border = 0;
+    const format = gl.RGBA;
+    const type = gl.UNSIGNED_BYTE;
+    const data = null;
+    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
+                  targetTextureWidth, targetTextureHeight, border,
+                  format, type, data);
+
+    // set the filtering so we don't need mips
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    // Create and bind the framebuffer
+    intermediateFrameBuffer2 = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer2);
+
+    // attach the texture as the first color attachment
+    const attachmentPoint = gl.COLOR_ATTACHMENT0;
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, intermediateTexture2, level);
   }
 
 }
 
 function render() {
+  window.requestAnimationFrame(render, canvas);
+
   // Update frame buffer (texture data)
   gl.useProgram(program);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
   positionLocation = gl.getAttribLocation(program, "a_position");
   gl.enableVertexAttribArray(positionLocation);
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+  uSampler = gl.getUniformLocation(copyProgram, 'uSampler');
+  gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
+  if (currentBuffer === 1) {
+    gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer1);
+  } else {
+    gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer2);
+  }
+
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
   // Draw to screen
   gl.useProgram(copyProgram);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.bindTexture(gl.TEXTURE_2D, targetTexture);
+  gl.bindTexture(gl.TEXTURE_2D, currentBuffer === 1 ? intermediateTexture1 : intermediateTexture2);
   positionLocation = gl.getAttribLocation(copyProgram, "a_position");
   uSampler = gl.getUniformLocation(copyProgram, 'uSampler');
-  // Tell the shader we bound the texture to texture unit 0
-  gl.uniform1i(uSampler, 0);
+  gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
   gl.enableVertexAttribArray(positionLocation);
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  currentBuffer = currentBuffer === 1 ? 2 : 1;
 }
 
 
