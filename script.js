@@ -10,6 +10,8 @@ let phase1Program, intermediateTexture1, intermediateFrameBuffer1;
 let phase2Program, intermediateTexture2, intermediateFrameBuffer2;
 let phase3Program, intermediateTexture3, intermediateFrameBuffer3;
 let fps = 0;
+let cursorX = width/2;
+let cursorY = height/2;
 
 setupWebGL();
 displayFps();
@@ -19,6 +21,7 @@ function setupWebGL() {
   const onePixel = 1/width;
 
   canvas = document.querySelector("#glCanvas");
+  canvas.onmousemove = mouseMove;
   canvas.width = width;
   canvas.height = height;
   gl = canvas.getContext("webgl");
@@ -114,6 +117,8 @@ function setupWebGL() {
       precision mediump float;
     #endif
     uniform sampler2D uSampler;
+    uniform float hotSpotX;
+    uniform float hotSpotY;
     void main() {
       float x = gl_FragCoord.x / ${width}.0;
       float y = gl_FragCoord.y / ${height}.0;
@@ -129,8 +134,8 @@ function setupWebGL() {
       local[1] += (neighbor3[3] - neighbor4[3]) * 0.25;
 
       // Hot spot
-      float relX = x - ${hotSpotX.toFixed(2)};
-      float relY = y - ${hotSpotY.toFixed(2)};
+      float relX = x - hotSpotX;
+      float relY = y - hotSpotY;
       float dist = sqrt(relX * relX + relY * relY);
       if (dist < ${hotSpotSize.toFixed(2)}) local[2] += 0.005;
 
@@ -162,7 +167,7 @@ function setupWebGL() {
       vec2 xy = vec2(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0);
       vec4 local = texture2D(uSampler, xy);
       vec2 velocity = vec2(local[0], local[1]);
-      vec2 srcXY = xy - velocity * 0.001;
+      vec2 srcXY = xy - velocity * 0.02;
       vec4 source = texture2D(uSampler, srcXY);
       gl_FragColor = source;
       // gl_FragColor = vec4(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0, 0, 1);
@@ -290,8 +295,8 @@ function initTexture() {
   for (let yi = 0; yi < height; yi++) {
     for (let xi = 0; xi < width; xi++) {
       const value = Math.hypot(xi - width/2, yi - height/2) < 50 ? 1 : 0;
-      initialData[(xi + yi*width) * 4 + 0] = Math.random() * 2 - 1; // velocity x
-      initialData[(xi + yi*width) * 4 + 1] = Math.random() * 2 - 1; // velocity y
+      initialData[(xi + yi*width) * 4 + 0] = (Math.random() * 2 - 1)*0.1; // velocity x
+      initialData[(xi + yi*width) * 4 + 1] = (Math.random() * 2 - 1)*0.1; // velocity y
       initialData[(xi + yi*width) * 4 + 2] = value; // heat/color
       initialData[(xi + yi*width) * 4 + 3] = 0; // pressure
     }
@@ -389,7 +394,7 @@ function render() {
   // Slowed down for debugging
   // setTimeout(render, 500);
 
-  const stepsPerFrame = 3;
+  const stepsPerFrame = 1;
   for (let i = 0; i < stepsPerFrame; i++) {
     step();
   }
@@ -411,6 +416,9 @@ function render() {
 }
 
 function step() {
+  let hotSpotX;
+  let hotSpotY;
+
   // Phase 1
   gl.useProgram(phase1Program);
   positionLocation = gl.getAttribLocation(phase1Program, "a_position");
@@ -430,6 +438,10 @@ function step() {
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
   uSampler = gl.getUniformLocation(phase2Program, 'uSampler');
   gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
+  hotSpotX = gl.getUniformLocation(phase2Program, 'hotSpotX');
+  hotSpotY = gl.getUniformLocation(phase2Program, 'hotSpotY');
+  gl.uniform1f(hotSpotX, cursorX/width);
+  gl.uniform1f(hotSpotY, 1 - cursorY/height);
   gl.bindTexture(gl.TEXTURE_2D, intermediateTexture2);
   gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer1);
 
@@ -453,6 +465,10 @@ function step() {
   gl.enableVertexAttribArray(positionLocation);
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
   uSampler = gl.getUniformLocation(phase2Program, 'uSampler');
+  hotSpotX = gl.getUniformLocation(phase2Program, 'hotSpotX');
+  hotSpotY = gl.getUniformLocation(phase2Program, 'hotSpotY');
+  gl.uniform1f(hotSpotX, cursorX/width);
+  gl.uniform1f(hotSpotY, 1 - cursorY/height);
   gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
   gl.bindTexture(gl.TEXTURE_2D, intermediateTexture2);
   gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer3);
@@ -471,7 +487,6 @@ function step() {
   gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer1);
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
-
 }
 
 
@@ -486,4 +501,10 @@ function displayFps() {
   setTimeout(displayFps, 1000);
   document.getElementById('fps-counter').innerText = `FPS: ${fps}`
   fps = 0;
+}
+
+function mouseMove(event) {
+  const rect = canvas.getBoundingClientRect();
+  cursorX = event.clientX - rect.left;
+  cursorY = event.clientY - rect.top;
 }
