@@ -3,7 +3,7 @@
 // https://blog.mayflower.de/4584-Playing-around-with-pixel-shaders-in-WebGL.html
 // https://webglfundamentals.org/webgl/lessons/webgl-render-to-texture.html
 
-const width = 256;
+const width = 512;
 const height = width;
 let gl, outputProgram, buffer, canvas;
 let phase1Program, intermediateTexture1, intermediateFrameBuffer1;
@@ -132,7 +132,7 @@ function setupWebGL() {
       float relX = x - ${hotSpotX.toFixed(2)};
       float relY = y - ${hotSpotY.toFixed(2)};
       float dist = sqrt(relX * relX + relY * relY);
-      if (dist < ${hotSpotSize.toFixed(2)}) local[2] += 0.01;
+      if (dist < ${hotSpotSize.toFixed(2)}) local[2] += 0.005;
 
       // Buoyancy of "hot" colors
       local[1] += local[2] * 0.002;
