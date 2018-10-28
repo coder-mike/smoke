@@ -50,8 +50,8 @@ function setupWebGL() {
   gl.compileShader(copyVertexShader);
 
   // ------------- Fragment shader ----------------------
-  const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-  gl.shaderSource(fragmentShader, `
+  const processFragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(processFragmentShader, `
     #version 100
     #ifdef GL_FRAGMENT_PRECISION_HIGH
       precision highp float;
@@ -60,18 +60,31 @@ function setupWebGL() {
     #endif
     uniform sampler2D uSampler;
     void main() {
-      gl_FragColor = texture2D(uSampler, vec2(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0 - 1.0/512.0));
+      vec2 xy = vec2(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0);
+      vec4 local = texture2D(uSampler, xy);
+      vec2 velocity = vec2(local[0], local[1]);
+      vec2 srcXY = xy - velocity * 0.001;
+      vec4 source = texture2D(uSampler, srcXY);
+      source[1] += source[2] * 0.01;
+      gl_FragColor = source;
       // gl_FragColor = vec4(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0, 0, 1);
     }
   `);
-  gl.compileShader(fragmentShader);
+  gl.compileShader(processFragmentShader);
 
   // ------------- Copy fragment shader ----------------------
   const outputFragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
   gl.shaderSource(outputFragmentShader, `
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+      precision highp float;
+    #else
+      precision mediump float;
+    #endif
     uniform sampler2D uSampler;
     void main() {
-      gl_FragColor = texture2D(uSampler, vec2(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0));
+      vec2 coord = vec2(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0);
+      vec4 sample = texture2D(uSampler, coord);
+      gl_FragColor = vec4(sample[2], sample[2], sample[2], 1.0);
     }
   `);
   gl.compileShader(outputFragmentShader);
@@ -80,7 +93,7 @@ function setupWebGL() {
   program = gl.createProgram();
   copyProgram = gl.createProgram();
   gl.attachShader(program, vertexShader);
-  gl.attachShader(program, fragmentShader);
+  gl.attachShader(program, processFragmentShader);
   gl.linkProgram(program);
   // gl.detachShader(program, vertexShader);
   // gl.detachShader(program, fragmentShader);
@@ -139,9 +152,9 @@ function initTexture() {
   const initialData = new Float32Array(width*height*4);
   for (let yi = 0; yi < height; yi++) {
     for (let xi = 0; xi < width; xi++) {
-      const value = (Math.floor(xi / 32) + Math.floor(yi / 32)) % 2 === 0 ? 0.7 : 0.3;
-      initialData[(xi + yi*width) * 4 + 0] = value;
-      initialData[(xi + yi*width) * 4 + 1] = value;
+      const value = (Math.floor(xi / 32) + Math.floor(yi / 32)) % 2 === 0 ? 0 : 1;
+      initialData[(xi + yi*width) * 4 + 0] = Math.random() * 2 - 1;
+      initialData[(xi + yi*width) * 4 + 1] = Math.random() * 2 - 1;
       initialData[(xi + yi*width) * 4 + 2] = value;
       initialData[(xi + yi*width) * 4 + 3] = 255; // alpha
     }
