@@ -9,9 +9,10 @@ let gl, program, copyProgram, buffer, canvas;
 let intermediateTexture1, intermediateFrameBuffer1;
 let intermediateTexture2, intermediateFrameBuffer2;
 let nextTarget = 1;
+let fps = 0;
 
 setupWebGL();
-
+displayFps();
 
 function setupWebGL() {
   canvas = document.querySelector("#glCanvas");
@@ -66,14 +67,14 @@ function setupWebGL() {
   gl.compileShader(fragmentShader);
 
   // ------------- Copy fragment shader ----------------------
-  const copyFragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-  gl.shaderSource(copyFragmentShader, `
+  const outputFragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(outputFragmentShader, `
     uniform sampler2D uSampler;
     void main() {
       gl_FragColor = texture2D(uSampler, vec2(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0));
     }
   `);
-  gl.compileShader(copyFragmentShader);
+  gl.compileShader(outputFragmentShader);
 
   // --------------- Program --------------------------
   program = gl.createProgram();
@@ -96,7 +97,7 @@ function setupWebGL() {
   }
 
   gl.attachShader(copyProgram, copyVertexShader);
-  gl.attachShader(copyProgram, copyFragmentShader);
+  gl.attachShader(copyProgram, outputFragmentShader);
   gl.linkProgram(copyProgram);
 
   if (!gl.getProgramParameter(copyProgram, gl.LINK_STATUS)) {
@@ -226,6 +227,7 @@ function render() {
   // gl.clear(gl.COLOR_BUFFER_BIT);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
+  fps++;
 }
 
 function step() {
@@ -256,4 +258,10 @@ function cleanup() {
   gl.useProgram(null);
   if (buffer) gl.deleteBuffer(buffer);
   if (program) gl.deleteProgram(program);
+}
+
+function displayFps() {
+  setTimeout(displayFps, 1000);
+  document.getElementById('fps-counter').innerText = `FPS: ${fps}`
+  fps = 0;
 }
