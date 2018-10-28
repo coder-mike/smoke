@@ -106,7 +106,7 @@ function setupWebGL() {
 
   const hotSpotX = 0.5;
   const hotSpotY = 0.1;
-  const hotSpotSize = 0.04;
+  const hotSpotSize = 0.02;
 
   // Stage 2 corrects the velocities according to the overall pressure
   gl.shaderSource(stage2FragmentShader, `
@@ -137,11 +137,14 @@ function setupWebGL() {
       float relX = x - hotSpotX;
       float relY = y - hotSpotY;
       float dist = sqrt(relX * relX + relY * relY);
-      if (dist < ${hotSpotSize.toFixed(2)}) local[2] += 0.005;
+      if (dist < ${hotSpotSize.toFixed(2)}) local[2] = 1.0;
 
       // Buoyancy of "hot" colors
-      local[1] += local[2] * 0.002;
+      local[1] += local[2] * 0.001;
 
+      // kill the edges
+      if ((x < ${onePixel}) || (y < ${onePixel}) || (x >= 1.0 - ${onePixel}) || (y >= 1.0 - ${onePixel}))
+        local = vec4(0,0,0,0);
 
       gl_FragColor = local;
       // gl_FragColor = vec4(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0, 0, 1);
@@ -301,7 +304,6 @@ function initTexture() {
       initialData[(xi + yi*width) * 4 + 3] = 0; // pressure
     }
   }
-
 
   intermediateTexture1 = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
