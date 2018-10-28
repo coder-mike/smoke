@@ -16,6 +16,30 @@
   <canvas id="glCanvas"></canvas>
   <div id="fps-counter"></div>
   <a href="https://github.com/coder-mike/smoke">https://github.com/coder-mike/smoke</a>
+
+  <section style="max-width: 800px">
+    <h2>How it works</h2>
+    <p>The fluid is divided into a 512x512 grid of cells. Each cell is encoded as a pixel in a WebGL texture:</p>
+    <ul>
+      <li>Velocity X (stored in R channel) &ndash; tells you the momentum of the fluid through the cell in the X direction</li>
+      <li>Velocity Y (stored in G channel) &ndash; tells you the momentum of the fluid through the cell in the Y direction</li>
+      <li>Heat (stored in G channel) &ndash; used to represent the color, as well as a buoyancy.</li>
+      <li>Pressure (stored in A channel) &ndash; used to normalize the velocities in a way that satisfies the <a href="https://en.wikipedia.org/wiki/Navier%E2%80%93Stokes_equations">Navier-Stokes equations</a>.</li>
+    </ul>
+    <p>There are a number of different stages of the processing pipeline, as follows.</p>
+    <ol>
+      <li><strong>Stage 1:</strong> Calculate the pressure associated with each pixel, according to the amount of fluid flowing into it (positive pressure) or out of it (negative pressure), according to the velocities of neighboring pixels.</li>
+      <li><strong>Stage 2:</strong> Adjust the velocities at each pixel to counter-balance the pressure differential across that pixel (measured using pressures of neighboring pixels). This update is what gives the fluid its "twirliness".</li>
+      <li><strong>Stage 3:</strong> Adjust the velocities at each pixel to account for external forces, such the heat at the cursor, "drafts" from cursor movement, the buoyancy force of hot pixels, etc.</li>
+      <li><strong>Stage 4:</strong> Use the velocity of each pixel as a displacement map. Pixel data is fetched by subtracting the velocity from the pixel position to get where the fluid would be "flowing from", and copying the fluid data from the "source" position of each pixel.</li>
+      <li><strong>Stage 5:</strong> Map the fluid pixel states to the output colors.</li>
+    </ol>
+    <p>This process is repeated every frame.</p>
+    <p>I don't remember where I got this algorithm from &ndash; it's something I encountered many years ago, and managed recall enough of it today to recreate the effect.</p>
+    <h2>Why the hot pink color?</h2>
+    <p>Why not?</p>
+  </section>
   <script src="script.js"></script>
+  <div style="height:300px"></div>
 </body>
 </html>

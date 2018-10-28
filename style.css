@@ -4,11 +4,18 @@ html, body {
   font-family: 'Roboto', sans-serif;
 }
 
+body {
+  max-width: 1000px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 h1 {
   font-weight: 100;
   font-size: 3em;
 }
 
 canvas {
-  border: 2px solid #fcd
+  border: 2px solid #fcd;
 }
+
