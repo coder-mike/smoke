@@ -332,7 +332,7 @@ function initTexture() {
       const value = Math.hypot(xi - width/2, yi - height/2) < 50 ? 1 : 0;
       initialData[(xi + yi*width) * 4 + 0] = (Math.random() * 2 - 1)*0.1; // velocity x
       initialData[(xi + yi*width) * 4 + 1] = (Math.random() * 2 - 1)*0.1; // velocity y
-      initialData[(xi + yi*width) * 4 + 2] = value; // heat/color
+      initialData[(xi + yi*width) * 4 + 2] = 0;//value; // heat/color
       initialData[(xi + yi*width) * 4 + 3] = 0; // pressure
     }
   }

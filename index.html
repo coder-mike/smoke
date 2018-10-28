@@ -8,9 +8,11 @@
   <title>Smoke</title>
 </head>
 <body>
+  <div style="text-align: right">28 October 2018<br><a href="//coder-mike.com">Michael Hunter</a></div>
   <h1>Smoke</h1>
   <p>I made this while playing around on a Sunday afternoon when I'm meant to be doing other things.</p>
   <p>Requires WebGL and hardware accelerated floating point textures. <strong>Doesn't seem to work on mobile.</strong></p>
+  <p><a href="#video"><strong>Scroll down to see a video if it isn't working on your device.</strong></a></p>
   <p>Move your cursor over the box to interact. If it doesn't work, it's probably a hardware incompatibility.</p>
   <div id="compile-info"></div>
   <canvas id="glCanvas"></canvas>
@@ -21,10 +23,10 @@
     <h2>How it works</h2>
     <p>The fluid is divided into a 512x512 grid of cells. Each cell is encoded as a pixel in a WebGL texture:</p>
     <ul>
-      <li>Velocity X (stored in R channel) &ndash; tells you the momentum of the fluid through the cell in the X direction</li>
-      <li>Velocity Y (stored in G channel) &ndash; tells you the momentum of the fluid through the cell in the Y direction</li>
-      <li>Heat (stored in G channel) &ndash; used to represent the color, as well as a buoyancy.</li>
-      <li>Pressure (stored in A channel) &ndash; used to normalize the velocities in a way that satisfies the <a href="https://en.wikipedia.org/wiki/Navier%E2%80%93Stokes_equations">Navier-Stokes equations</a>.</li>
+      <li>Velocity X (stored in R color channel) &ndash; tells you the momentum of the fluid through the cell in the X direction</li>
+      <li>Velocity Y (stored in G color channel) &ndash; tells you the momentum of the fluid through the cell in the Y direction</li>
+      <li>Heat (stored in G color channel) &ndash; used to represent the color, as well as a buoyancy.</li>
+      <li>Pressure (stored in alpha channel) &ndash; used to normalize the velocities in a way that satisfies the <a href="https://en.wikipedia.org/wiki/Navier%E2%80%93Stokes_equations">Navier-Stokes equations</a>.</li>
     </ul>
     <p>There are a number of different stages of the processing pipeline, as follows.</p>
     <ol>
@@ -38,6 +40,9 @@
     <p>I don't remember where I got this algorithm from &ndash; it's something I encountered many years ago, and managed recall enough of it today to recreate the effect.</p>
     <h2>Why the hot pink color?</h2>
     <p>Why not?</p>
+    <h2 id="video">If it doesn't work on your device...</h2>
+    <p>Here's a video of what it's meant to do (assuming the video plays on your device).</p>
+    <video controls src="smoke2.mp4"></video>
   </section>
   <script src="script.js"></script>
   <div style="height:300px"></div>
