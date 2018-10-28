@@ -10,8 +10,8 @@ let phase1Program, intermediateTexture1, intermediateFrameBuffer1;
 let phase2Program, intermediateTexture2, intermediateFrameBuffer2;
 let phase3Program, intermediateTexture3, intermediateFrameBuffer3;
 let fps = 0;
-let fireX = width/2;
-let fireY = height/2;
+let fireX = width * 0.5;
+let fireY = height * 0.9;
 let prevCursorX = 0;
 let prevCursorY = 0;
 let cursorX = 0;
@@ -27,8 +27,8 @@ function setupWebGL() {
   const onePixel = 1/width;
 
   canvas = document.querySelector("#glCanvas");
-  canvas.onmousedown = mouseDown;
-  window.onmousemove = mouseMove;
+  canvas.onmousemove = canvasMouseMove;
+  window.onmousemove = windowMouseMove;
   canvas.width = width;
   canvas.height = height;
   gl = canvas.getContext("webgl");
@@ -548,18 +548,15 @@ function displayFps() {
   fps = 0;
 }
 
-function mouseDown(event) {
+function canvasMouseMove(event) {
   const rect = canvas.getBoundingClientRect();
   fireX = event.clientX - rect.left;
   fireY = event.clientY - rect.top;
 }
 
-function mouseMove(event) {
+function windowMouseMove(event) {
   const rect = canvas.getBoundingClientRect();
 
   cursorX = event.clientX - rect.left;
   cursorY = event.clientY - rect.top;
-
-  fireX = event.clientX - rect.left;
-  fireY = event.clientY - rect.top;
 }
