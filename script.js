@@ -102,7 +102,7 @@ function setupWebGL() {
   const stage2FragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
 
   const hotSpotX = 0.5;
-  const hotSpotY = 0.2;
+  const hotSpotY = 0.1;
   const hotSpotSize = 0.04;
 
   // Stage 2 corrects the velocities according to the overall pressure
