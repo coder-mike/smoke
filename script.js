@@ -101,6 +101,10 @@ function setupWebGL() {
 
   const stage2FragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
 
+  const hotSpotX = 0.5;
+  const hotSpotY = 0.2;
+  const hotSpotSize = 0.04;
+
   // Stage 2 corrects the velocities according to the overall pressure
   gl.shaderSource(stage2FragmentShader, `
     #version 100
@@ -124,8 +128,15 @@ function setupWebGL() {
       local[0] += (neighbor1[3] - neighbor2[3]) * 0.25;
       local[1] += (neighbor3[3] - neighbor4[3]) * 0.25;
 
+      // Hot spot
+      float relX = x - ${hotSpotX.toFixed(2)};
+      float relY = y - ${hotSpotY.toFixed(2)};
+      float dist = sqrt(relX * relX + relY * relY);
+      if (dist < ${hotSpotSize.toFixed(2)}) local[2] += 0.01;
+
       // Buoyancy of "hot" colors
-      local[1] += local[2] * 0.01;
+      local[1] += local[2] * 0.002;
+
 
       gl_FragColor = local;
       // gl_FragColor = vec4(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0, 0, 1);
@@ -176,7 +187,10 @@ function setupWebGL() {
     void main() {
       vec2 coord = vec2(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0);
       vec4 sample = texture2D(uSampler, coord);
-      gl_FragColor = vec4(sample[2], sample[2], sample[2], 1.0);
+      gl_FragColor[0] = sample[2] * 1.000 + (1.0 - sample[2]) * 1.000;
+      gl_FragColor[1] = sample[2] * 0.188 + (1.0 - sample[2]) * 1.000;
+      gl_FragColor[2] = sample[2] * 0.349 + (1.0 - sample[2]) * 1.000;
+      gl_FragColor[3] = 1.0;
     }
   `);
   gl.compileShader(outputFragmentShader);
@@ -375,7 +389,7 @@ function render() {
   // Slowed down for debugging
   // setTimeout(render, 500);
 
-  const stepsPerFrame = 1;
+  const stepsPerFrame = 3;
   for (let i = 0; i < stepsPerFrame; i++) {
     step();
   }
