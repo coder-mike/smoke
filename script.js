@@ -3,8 +3,8 @@
 // https://blog.mayflower.de/4584-Playing-around-with-pixel-shaders-in-WebGL.html
 // https://webglfundamentals.org/webgl/lessons/webgl-render-to-texture.html
 
-const width = 512;
-const height = 512;
+const width = 256;
+const height = width;
 let gl, outputProgram, buffer, canvas;
 let phase1Program, intermediateTexture1, intermediateFrameBuffer1;
 let phase2Program, intermediateTexture2, intermediateFrameBuffer2;
@@ -16,7 +16,7 @@ displayFps();
 
 function setupWebGL() {
   let success;
-  const onePixel = 1/512;
+  const onePixel = 1/width;
 
   canvas = document.querySelector("#glCanvas");
   canvas.width = width;
@@ -275,7 +275,7 @@ function initTexture() {
   const initialData = new Float32Array(width*height*4);
   for (let yi = 0; yi < height; yi++) {
     for (let xi = 0; xi < width; xi++) {
-      const value = (Math.floor(xi / 32) + Math.floor(yi / 32)) % 2 === 0 ? 0 : 1;
+      const value = Math.hypot(xi - width/2, yi - height/2) < 50 ? 1 : 0;
       initialData[(xi + yi*width) * 4 + 0] = Math.random() * 2 - 1; // velocity x
       initialData[(xi + yi*width) * 4 + 1] = Math.random() * 2 - 1; // velocity y
       initialData[(xi + yi*width) * 4 + 2] = value; // heat/color
@@ -404,8 +404,8 @@ function step() {
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
   uSampler = gl.getUniformLocation(phase1Program, 'uSampler');
   gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
-  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture2);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer1);
+  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer2);
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -416,8 +416,32 @@ function step() {
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
   uSampler = gl.getUniformLocation(phase2Program, 'uSampler');
   gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
-  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture3);
+  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture2);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer1);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  // Phase 1
+  gl.useProgram(phase1Program);
+  positionLocation = gl.getAttribLocation(phase1Program, "a_position");
+  gl.enableVertexAttribArray(positionLocation);
+  gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+  uSampler = gl.getUniformLocation(phase1Program, 'uSampler');
+  gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
+  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
   gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer2);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  // Phase 2
+  gl.useProgram(phase2Program);
+  positionLocation = gl.getAttribLocation(phase2Program, "a_position");
+  gl.enableVertexAttribArray(positionLocation);
+  gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+  uSampler = gl.getUniformLocation(phase2Program, 'uSampler');
+  gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
+  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture2);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer3);
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
@@ -429,8 +453,8 @@ function step() {
   uSampler = gl.getUniformLocation(phase3Program, 'uSampler');
   gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
 
-  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer3);
+  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture3);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer1);
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
