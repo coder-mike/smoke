@@ -5,16 +5,19 @@
 
 const width = 512;
 const height = 512;
-let gl, program, copyProgram, buffer, canvas;
-let intermediateTexture1, intermediateFrameBuffer1;
-let intermediateTexture2, intermediateFrameBuffer2;
-let nextTarget = 1;
+let gl, outputProgram, buffer, canvas;
+let phase1Program, intermediateTexture1, intermediateFrameBuffer1;
+let phase2Program, intermediateTexture2, intermediateFrameBuffer2;
+let phase3Program, intermediateTexture3, intermediateFrameBuffer3;
 let fps = 0;
 
 setupWebGL();
 displayFps();
 
 function setupWebGL() {
+  let success;
+  const onePixel = 1/512;
+
   canvas = document.querySelector("#glCanvas");
   canvas.width = width;
   canvas.height = height;
@@ -38,6 +41,11 @@ function setupWebGL() {
     }
   `);
   gl.compileShader(vertexShader);
+  success = gl.getShaderParameter(vertexShader, gl.COMPILE_STATUS);
+  if (!success) {
+    // Something went wrong during compilation; get the error
+    throw "could not compile shader:" + gl.getShaderInfoLog(vertexShader);
+  }
 
   const copyVertexShader = gl.createShader(gl.VERTEX_SHADER);
   gl.shaderSource(copyVertexShader, `
@@ -48,10 +56,90 @@ function setupWebGL() {
     }
   `);
   gl.compileShader(copyVertexShader);
+  success = gl.getShaderParameter(copyVertexShader, gl.COMPILE_STATUS);
+  if (!success) {
+    // Something went wrong during compilation; get the error
+    throw "could not compile shader:" + gl.getShaderInfoLog(shader);
+  }
 
   // ------------- Fragment shader ----------------------
-  const processFragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-  gl.shaderSource(processFragmentShader, `
+  const stage1FragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+
+  // Stage 1 calculates fluid pressure, used for normalizing velocities
+  gl.shaderSource(stage1FragmentShader, `
+    #version 100
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+      precision highp float;
+    #else
+      precision mediump float;
+    #endif
+    uniform sampler2D uSampler;
+    void main() {
+      float x = gl_FragCoord.x / ${width}.0;
+      float y = gl_FragCoord.y / ${height}.0;
+
+      vec4 local = texture2D(uSampler, vec2(x, y));
+      vec4 neighbor1 = texture2D(uSampler, vec2(x - ${onePixel}, y));
+      vec4 neighbor2 = texture2D(uSampler, vec2(x + ${onePixel}, y));
+      vec4 neighbor3 = texture2D(uSampler, vec2(x, y - ${onePixel}));
+      vec4 neighbor4 = texture2D(uSampler, vec2(x, y + ${onePixel}));
+
+      // Pressure related to rate of inflow
+      float pressure = neighbor1[0] - neighbor2[0] + neighbor3[1] - neighbor4[1];
+
+      local[3] = pressure;
+      gl_FragColor = local;
+      // gl_FragColor = vec4(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0, 0, 1);
+    }
+  `);
+  gl.compileShader(stage1FragmentShader);
+  success = gl.getShaderParameter(stage1FragmentShader, gl.COMPILE_STATUS);
+  if (!success) {
+    // Something went wrong during compilation; get the error
+    throw "could not compile shader:" + gl.getShaderInfoLog(stage1FragmentShader);
+  }
+
+  const stage2FragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+
+  // Stage 2 corrects the velocities according to the overall pressure
+  gl.shaderSource(stage2FragmentShader, `
+    #version 100
+    #ifdef GL_FRAGMENT_PRECISION_HIGH
+      precision highp float;
+    #else
+      precision mediump float;
+    #endif
+    uniform sampler2D uSampler;
+    void main() {
+      float x = gl_FragCoord.x / ${width}.0;
+      float y = gl_FragCoord.y / ${height}.0;
+
+      vec4 local = texture2D(uSampler, vec2(x, y));
+      vec4 neighbor1 = texture2D(uSampler, vec2(x - ${onePixel}, y));
+      vec4 neighbor2 = texture2D(uSampler, vec2(x + ${onePixel}, y));
+      vec4 neighbor3 = texture2D(uSampler, vec2(x, y - ${onePixel}));
+      vec4 neighbor4 = texture2D(uSampler, vec2(x, y + ${onePixel}));
+
+      // Update velocity according to neighboring pressures
+      local[0] += (neighbor1[3] - neighbor2[3]) * 0.25;
+      local[1] += (neighbor3[3] - neighbor4[3]) * 0.25;
+
+      // Buoyancy of "hot" colors
+      local[1] += local[2] * 0.01;
+
+      gl_FragColor = local;
+      // gl_FragColor = vec4(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0, 0, 1);
+    }
+  `);
+  gl.compileShader(stage2FragmentShader);
+  success = gl.getShaderParameter(stage2FragmentShader, gl.COMPILE_STATUS);
+  if (!success) {
+    // Something went wrong during compilation; get the error
+    throw "could not compile shader:" + gl.getShaderInfoLog(stage2FragmentShader);
+  }
+
+  const stage3FragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(stage3FragmentShader, `
     #version 100
     #ifdef GL_FRAGMENT_PRECISION_HIGH
       precision highp float;
@@ -65,12 +153,16 @@ function setupWebGL() {
       vec2 velocity = vec2(local[0], local[1]);
       vec2 srcXY = xy - velocity * 0.001;
       vec4 source = texture2D(uSampler, srcXY);
-      source[1] += source[2] * 0.01;
       gl_FragColor = source;
       // gl_FragColor = vec4(gl_FragCoord.x / ${width}.0, gl_FragCoord.y / ${height}.0, 0, 1);
     }
   `);
-  gl.compileShader(processFragmentShader);
+  gl.compileShader(stage3FragmentShader);
+  success = gl.getShaderParameter(stage3FragmentShader, gl.COMPILE_STATUS);
+  if (!success) {
+    // Something went wrong during compilation; get the error
+    throw "could not compile shader:" + gl.getShaderInfoLog(stage3FragmentShader);
+  }
 
   // ------------- Copy fragment shader ----------------------
   const outputFragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
@@ -88,20 +180,20 @@ function setupWebGL() {
     }
   `);
   gl.compileShader(outputFragmentShader);
+  success = gl.getShaderParameter(outputFragmentShader, gl.COMPILE_STATUS);
+  if (!success) {
+    // Something went wrong during compilation; get the error
+    throw "could not compile shader:" + gl.getShaderInfoLog(outputFragmentShader);
+  }
 
   // --------------- Program --------------------------
-  program = gl.createProgram();
-  copyProgram = gl.createProgram();
-  gl.attachShader(program, vertexShader);
-  gl.attachShader(program, processFragmentShader);
-  gl.linkProgram(program);
-  // gl.detachShader(program, vertexShader);
-  // gl.detachShader(program, fragmentShader);
-  // gl.deleteShader(vertexShader);
-  // gl.deleteShader(fragmentShader);
+  phase1Program = gl.createProgram();
+  gl.attachShader(phase1Program, vertexShader);
+  gl.attachShader(phase1Program, stage1FragmentShader);
+  gl.linkProgram(phase1Program);
 
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    var linkErrLog = gl.getProgramInfoLog(program);
+  if (!gl.getProgramParameter(phase1Program, gl.LINK_STATUS)) {
+    var linkErrLog = gl.getProgramInfoLog(phase1Program);
     cleanup();
     document.querySelector("#compile-info").innerHTML =
       "Shader program did not link successfully. "
@@ -109,12 +201,45 @@ function setupWebGL() {
     return;
   }
 
-  gl.attachShader(copyProgram, copyVertexShader);
-  gl.attachShader(copyProgram, outputFragmentShader);
-  gl.linkProgram(copyProgram);
+  phase2Program = gl.createProgram();
+  gl.attachShader(phase2Program, vertexShader);
+  gl.attachShader(phase2Program, stage2FragmentShader);
+  gl.linkProgram(phase2Program);
 
-  if (!gl.getProgramParameter(copyProgram, gl.LINK_STATUS)) {
-    var linkErrLog = gl.getProgramInfoLog(copyProgram);
+  if (!gl.getProgramParameter(phase2Program, gl.LINK_STATUS)) {
+    var linkErrLog = gl.getProgramInfoLog(phase2Program);
+    cleanup();
+    document.querySelector("#compile-info").innerHTML =
+      "Shader program did not link successfully. "
+      + "Error log: " + linkErrLog;
+    return;
+  }
+
+  phase3Program = gl.createProgram();
+  gl.attachShader(phase3Program, vertexShader);
+  gl.attachShader(phase3Program, stage3FragmentShader);
+  gl.linkProgram(phase3Program);
+  // gl.detachShader(program, vertexShader);
+  // gl.detachShader(program, fragmentShader);
+  // gl.deleteShader(vertexShader);
+  // gl.deleteShader(fragmentShader);
+
+  if (!gl.getProgramParameter(phase3Program, gl.LINK_STATUS)) {
+    var linkErrLog = gl.getProgramInfoLog(phase3Program);
+    cleanup();
+    document.querySelector("#compile-info").innerHTML =
+      "Shader program did not link successfully. "
+      + "Error log: " + linkErrLog;
+    return;
+  }
+
+  outputProgram = gl.createProgram();
+  gl.attachShader(outputProgram, copyVertexShader);
+  gl.attachShader(outputProgram, outputFragmentShader);
+  gl.linkProgram(outputProgram);
+
+  if (!gl.getProgramParameter(outputProgram, gl.LINK_STATUS)) {
+    var linkErrLog = gl.getProgramInfoLog(outputProgram);
     cleanup();
     document.querySelector("#compile-info").innerHTML =
       "Shader copy-program did not link successfully. "
@@ -137,7 +262,7 @@ function setupWebGL() {
     );
 
   initTexture();
-  gl.useProgram(program);
+  gl.useProgram(phase1Program);
 
   render();
   // cleanup();
@@ -146,20 +271,21 @@ function setupWebGL() {
 function initTexture() {
   const targetTextureWidth = width;
   const targetTextureHeight = height;
-  intermediateTexture1 = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
 
   const initialData = new Float32Array(width*height*4);
   for (let yi = 0; yi < height; yi++) {
     for (let xi = 0; xi < width; xi++) {
       const value = (Math.floor(xi / 32) + Math.floor(yi / 32)) % 2 === 0 ? 0 : 1;
-      initialData[(xi + yi*width) * 4 + 0] = Math.random() * 2 - 1;
-      initialData[(xi + yi*width) * 4 + 1] = Math.random() * 2 - 1;
-      initialData[(xi + yi*width) * 4 + 2] = value;
-      initialData[(xi + yi*width) * 4 + 3] = 255; // alpha
+      initialData[(xi + yi*width) * 4 + 0] = Math.random() * 2 - 1; // velocity x
+      initialData[(xi + yi*width) * 4 + 1] = Math.random() * 2 - 1; // velocity y
+      initialData[(xi + yi*width) * 4 + 2] = value; // heat/color
+      initialData[(xi + yi*width) * 4 + 3] = 0; // pressure
     }
   }
 
+
+  intermediateTexture1 = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
   {
     // define size and format of level 0
     const level = 0;
@@ -188,7 +314,6 @@ function initTexture() {
 
   intermediateTexture2 = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, intermediateTexture2);
-
   {
     // define size and format of level 0
     const level = 0;
@@ -215,6 +340,34 @@ function initTexture() {
     gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, intermediateTexture2, level);
   }
 
+  intermediateTexture3 = gl.createTexture();
+  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture3);
+  {
+    // define size and format of level 0
+    const level = 0;
+    const internalFormat = gl.RGBA;
+    const border = 0;
+    const format = gl.RGBA;
+    const type = gl.FLOAT;
+    const data = null;
+    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
+                  targetTextureWidth, targetTextureHeight, border,
+                  format, type, initialData);
+
+    // set the filtering so we don't need mips
+    gl.texParameterf(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameterf(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameterf(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+
+    // Create and bind the framebuffer
+    intermediateFrameBuffer3 = gl.createFramebuffer();
+    gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer3);
+
+    // attach the texture as the first color attachment
+    const attachmentPoint = gl.COLOR_ATTACHMENT0;
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, attachmentPoint, gl.TEXTURE_2D, intermediateTexture3, level);
+  }
+
 }
 
 function render() {
@@ -228,11 +381,11 @@ function render() {
   }
 
   // Draw to screen
-  gl.useProgram(copyProgram);
+  gl.useProgram(outputProgram);
   gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.bindTexture(gl.TEXTURE_2D, nextTarget === 1 ? intermediateTexture2 : intermediateTexture1);
-  positionLocation = gl.getAttribLocation(copyProgram, "a_position");
-  uSampler = gl.getUniformLocation(copyProgram, 'uSampler');
+  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
+  positionLocation = gl.getAttribLocation(outputProgram, "a_position");
+  uSampler = gl.getUniformLocation(outputProgram, 'uSampler');
   gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
   gl.enableVertexAttribArray(positionLocation);
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
@@ -244,33 +397,51 @@ function render() {
 }
 
 function step() {
-// Update frame buffer (texture data)
-  gl.useProgram(program);
-  positionLocation = gl.getAttribLocation(program, "a_position");
+  // Phase 1
+  gl.useProgram(phase1Program);
+  positionLocation = gl.getAttribLocation(phase1Program, "a_position");
   gl.enableVertexAttribArray(positionLocation);
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
-  uSampler = gl.getUniformLocation(program, 'uSampler');
+  uSampler = gl.getUniformLocation(phase1Program, 'uSampler');
   gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
-  if (nextTarget === 1) {
-    gl.bindTexture(gl.TEXTURE_2D, intermediateTexture2);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer1);
-  } else {
-    gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
-    gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer2);
-  }
+  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture2);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer1);
 
-  // gl.clearColor(currentBuffer === 1 ? 0.55 : 0.45, 0.5, 0.5, 1.0);
-  // gl.clear(gl.COLOR_BUFFER_BIT);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  nextTarget = nextTarget === 1 ? 2 : 1;
+  // Phase 2
+  gl.useProgram(phase2Program);
+  positionLocation = gl.getAttribLocation(phase2Program, "a_position");
+  gl.enableVertexAttribArray(positionLocation);
+  gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+  uSampler = gl.getUniformLocation(phase2Program, 'uSampler');
+  gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
+  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture3);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer2);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  // Phase 3
+  gl.useProgram(phase3Program);
+  positionLocation = gl.getAttribLocation(phase3Program, "a_position");
+  gl.enableVertexAttribArray(positionLocation);
+  gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+  uSampler = gl.getUniformLocation(phase3Program, 'uSampler');
+  gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
+
+  gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer3);
+
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
 }
 
 
 function cleanup() {
   gl.useProgram(null);
   if (buffer) gl.deleteBuffer(buffer);
-  if (program) gl.deleteProgram(program);
+  if (phase1Program) gl.deleteProgram(phase1Program);
+  if (phase3Program) gl.deleteProgram(phase3Program);
 }
 
 function displayFps() {
