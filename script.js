@@ -8,7 +8,7 @@ const height = 512;
 let gl, program, copyProgram, buffer, canvas;
 let intermediateTexture1, intermediateFrameBuffer1;
 let intermediateTexture2, intermediateFrameBuffer2;
-let currentBuffer = 1;
+let nextTarget = 1;
 
 setupWebGL();
 
@@ -204,14 +204,34 @@ function render() {
   // Slowed down for debugging
   // setTimeout(render, 500);
 
-  // Update frame buffer (texture data)
+  for (let i = 0; i < 10; i++) {
+    step();
+  }
+
+  // Draw to screen
+  gl.useProgram(copyProgram);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  gl.bindTexture(gl.TEXTURE_2D, nextTarget === 1 ? intermediateTexture2 : intermediateTexture1);
+  positionLocation = gl.getAttribLocation(copyProgram, "a_position");
+  uSampler = gl.getUniformLocation(copyProgram, 'uSampler');
+  gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
+  gl.enableVertexAttribArray(positionLocation);
+  gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+  // gl.clearColor(0.5, 0.5, 0.5, 1.0);
+  // gl.clear(gl.COLOR_BUFFER_BIT);
+  gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+}
+
+function step() {
+// Update frame buffer (texture data)
   gl.useProgram(program);
   positionLocation = gl.getAttribLocation(program, "a_position");
   gl.enableVertexAttribArray(positionLocation);
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
   uSampler = gl.getUniformLocation(program, 'uSampler');
   gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
-  if (currentBuffer === 1) {
+  if (nextTarget === 1) {
     gl.bindTexture(gl.TEXTURE_2D, intermediateTexture2);
     gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer1);
   } else {
@@ -223,20 +243,7 @@ function render() {
   // gl.clear(gl.COLOR_BUFFER_BIT);
   gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  // Draw to screen
-  gl.useProgram(copyProgram);
-  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-  gl.bindTexture(gl.TEXTURE_2D, currentBuffer === 1 ? intermediateTexture1 : intermediateTexture2);
-  positionLocation = gl.getAttribLocation(copyProgram, "a_position");
-  uSampler = gl.getUniformLocation(copyProgram, 'uSampler');
-  gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
-  gl.enableVertexAttribArray(positionLocation);
-  gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
-  // gl.clearColor(0.5, 0.5, 0.5, 1.0);
-  // gl.clear(gl.COLOR_BUFFER_BIT);
-  gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-  currentBuffer = currentBuffer === 1 ? 2 : 1;
+  nextTarget = nextTarget === 1 ? 2 : 1;
 }
 
 
