@@ -10,8 +10,14 @@ let phase1Program, intermediateTexture1, intermediateFrameBuffer1;
 let phase2Program, intermediateTexture2, intermediateFrameBuffer2;
 let phase3Program, intermediateTexture3, intermediateFrameBuffer3;
 let fps = 0;
-let cursorX = width/2;
-let cursorY = height/2;
+let fireX = width/2;
+let fireY = height/2;
+let prevCursorX = 0;
+let prevCursorY = 0;
+let cursorX = 0;
+let cursorY = 0;
+let cursorVX = 0;
+let cursorVY = 0;
 
 setupWebGL();
 displayFps();
@@ -21,7 +27,8 @@ function setupWebGL() {
   const onePixel = 1/width;
 
   canvas = document.querySelector("#glCanvas");
-  canvas.onmousemove = mouseMove;
+  canvas.onmousedown = mouseDown;
+  window.onmousemove = mouseMove;
   canvas.width = width;
   canvas.height = height;
   gl = canvas.getContext("webgl");
@@ -104,9 +111,8 @@ function setupWebGL() {
 
   const stage2FragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
 
-  const hotSpotX = 0.5;
-  const hotSpotY = 0.1;
   const hotSpotSize = 0.02;
+  const blowRadius = 0.1;
 
   // Stage 2 corrects the velocities according to the overall pressure
   gl.shaderSource(stage2FragmentShader, `
@@ -119,7 +125,15 @@ function setupWebGL() {
     uniform sampler2D uSampler;
     uniform float hotSpotX;
     uniform float hotSpotY;
+    uniform float cursorX;
+    uniform float cursorY;
+    uniform float prevCursorX;
+    uniform float prevCursorY;
+    uniform float cursorVX;
+    uniform float cursorVY;
     void main() {
+      float blowAmount;
+
       float x = gl_FragCoord.x / ${width}.0;
       float y = gl_FragCoord.y / ${height}.0;
 
@@ -138,6 +152,24 @@ function setupWebGL() {
       float relY = y - hotSpotY;
       float dist = sqrt(relX * relX + relY * relY);
       if (dist < ${hotSpotSize.toFixed(2)}) local[2] = 1.0;
+
+      // Cursor
+      relX = x - cursorX;
+      relY = y - cursorY;
+      dist = sqrt(relX * relX + relY * relY);
+      blowAmount = 1.0 - dist / ${blowRadius.toFixed(2)};
+      if (blowAmount > 0.0) {
+        local[0] += cursorVX * blowAmount * 0.1;
+        local[1] += cursorVY * blowAmount * 0.1;
+      }
+      relX = x - prevCursorX;
+      relY = y - prevCursorY;
+      dist = sqrt(relX * relX + relY * relY);
+      blowAmount = 1.0 - dist / ${blowRadius.toFixed(2)};
+      if (blowAmount > 0.0) {
+        local[0] += cursorVX * blowAmount * 0.1;
+        local[1] += cursorVY * blowAmount * 0.1;
+      }
 
       // Buoyancy of "hot" colors
       local[1] += local[2] * 0.001;
@@ -418,8 +450,8 @@ function render() {
 }
 
 function step() {
-  let hotSpotX;
-  let hotSpotY;
+  cursorVX = cursorX - prevCursorX;
+  cursorVY = cursorY - prevCursorY;
 
   // Phase 1
   gl.useProgram(phase1Program);
@@ -440,10 +472,14 @@ function step() {
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
   uSampler = gl.getUniformLocation(phase2Program, 'uSampler');
   gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
-  hotSpotX = gl.getUniformLocation(phase2Program, 'hotSpotX');
-  hotSpotY = gl.getUniformLocation(phase2Program, 'hotSpotY');
-  gl.uniform1f(hotSpotX, cursorX/width);
-  gl.uniform1f(hotSpotY, 1 - cursorY/height);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'hotSpotX'), fireX/width);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'hotSpotY'), 1 - fireY/height);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'cursorX'), cursorX/width);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'cursorY'), 1 - cursorY/height);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'prevCursorX'), prevCursorX/width);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'prevCursorY'), 1 - prevCursorY/height);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'cursorVX'), cursorVX/width);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'cursorVY'), -cursorVY/height);
   gl.bindTexture(gl.TEXTURE_2D, intermediateTexture2);
   gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer1);
 
@@ -467,10 +503,14 @@ function step() {
   gl.enableVertexAttribArray(positionLocation);
   gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
   uSampler = gl.getUniformLocation(phase2Program, 'uSampler');
-  hotSpotX = gl.getUniformLocation(phase2Program, 'hotSpotX');
-  hotSpotY = gl.getUniformLocation(phase2Program, 'hotSpotY');
-  gl.uniform1f(hotSpotX, cursorX/width);
-  gl.uniform1f(hotSpotY, 1 - cursorY/height);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'hotSpotX'), fireX/width);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'hotSpotY'), 1 - fireY/height);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'cursorX'), cursorX/width);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'cursorY'), 1 - cursorY/height);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'prevCursorX'), prevCursorX/width);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'prevCursorY'), 1 - prevCursorY/height);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'cursorVX'), cursorVX/width);
+  gl.uniform1f(gl.getUniformLocation(phase2Program, 'cursorVY'), -cursorVY/height);
   gl.uniform1i(uSampler, 0); // Tell the shader we bound the texture to texture unit 0
   gl.bindTexture(gl.TEXTURE_2D, intermediateTexture2);
   gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer3);
@@ -489,6 +529,9 @@ function step() {
   gl.bindFramebuffer(gl.FRAMEBUFFER, intermediateFrameBuffer1);
 
   gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+  prevCursorX = cursorX;
+  prevCursorY = cursorY;
 }
 
 
@@ -505,8 +548,18 @@ function displayFps() {
   fps = 0;
 }
 
+function mouseDown(event) {
+  const rect = canvas.getBoundingClientRect();
+  fireX = event.clientX - rect.left;
+  fireY = event.clientY - rect.top;
+}
+
 function mouseMove(event) {
   const rect = canvas.getBoundingClientRect();
+
   cursorX = event.clientX - rect.left;
   cursorY = event.clientY - rect.top;
+
+  fireX = event.clientX - rect.left;
+  fireY = event.clientY - rect.top;
 }
