@@ -12,12 +12,16 @@ let nextTarget = 1;
 
 setupWebGL();
 
+
 function setupWebGL() {
   canvas = document.querySelector("#glCanvas");
   canvas.width = width;
   canvas.height = height;
   gl = canvas.getContext("webgl");
   if (gl === null) return alert("Unable to initialize WebGL. Your browser or machine may not support it.");
+
+  gl.getExtension('OES_texture_float');
+  gl.getExtension('OES_texture_float_linear');
 
   gl.viewport(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight);
   gl.clearColor(0.5, 0.5, 0.5, 1.0);
@@ -131,10 +135,10 @@ function initTexture() {
   intermediateTexture1 = gl.createTexture();
   gl.bindTexture(gl.TEXTURE_2D, intermediateTexture1);
 
-  const initialData = new Uint8Array(width*height*4);
+  const initialData = new Float32Array(width*height*4);
   for (let yi = 0; yi < height; yi++) {
     for (let xi = 0; xi < width; xi++) {
-      const value = (Math.floor(xi / 32) + Math.floor(yi / 32)) % 2 === 0 ? 192 : 64;
+      const value = (Math.floor(xi / 32) + Math.floor(yi / 32)) % 2 === 0 ? 0.7 : 0.3;
       initialData[(xi + yi*width) * 4 + 0] = value;
       initialData[(xi + yi*width) * 4 + 1] = value;
       initialData[(xi + yi*width) * 4 + 2] = value;
@@ -148,16 +152,16 @@ function initTexture() {
     const internalFormat = gl.RGBA;
     const border = 0;
     const format = gl.RGBA;
-    const type = gl.UNSIGNED_BYTE;
+    const type = gl.FLOAT;
     const data = null;
     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
                   targetTextureWidth, targetTextureHeight, border,
                   format, type, initialData);
 
     // set the filtering so we don't need mips
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameterf(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameterf(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameterf(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     // Create and bind the framebuffer
     intermediateFrameBuffer1 = gl.createFramebuffer();
@@ -177,16 +181,16 @@ function initTexture() {
     const internalFormat = gl.RGBA;
     const border = 0;
     const format = gl.RGBA;
-    const type = gl.UNSIGNED_BYTE;
+    const type = gl.FLOAT;
     const data = null;
     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
                   targetTextureWidth, targetTextureHeight, border,
                   format, type, initialData);
 
     // set the filtering so we don't need mips
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameterf(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameterf(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameterf(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
 
     // Create and bind the framebuffer
     intermediateFrameBuffer2 = gl.createFramebuffer();
@@ -204,7 +208,8 @@ function render() {
   // Slowed down for debugging
   // setTimeout(render, 500);
 
-  for (let i = 0; i < 10; i++) {
+  const stepsPerFrame = 1;
+  for (let i = 0; i < stepsPerFrame; i++) {
     step();
   }
 
